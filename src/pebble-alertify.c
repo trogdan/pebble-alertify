@@ -12,58 +12,6 @@ static GBitmap *g_gbMainMenuIcons;
 static uint16_t g_iCurrentMainMenuItem = 0;
 static uint16_t g_iTotalMainMenuItems = 0;
 
-static PropertyAnimation *g_paSelectedAnimation;
-
-static void animation_started(Animation *animation, void *data) {
-  //text_layer_set_text(text_layer, notification_message);
-}
-
-static void animation_stopped(Animation *animation, bool finished, void *data) {
-  //text_layer_set_text(text_layer, notification_message);
-}
-
-static void destroy_property_animation(PropertyAnimation **prop_animation) {
-  if (*prop_animation == NULL) {
-    return;
-  }
-
-  if (animation_is_scheduled((Animation*) *prop_animation)) {
-    animation_unschedule((Animation*) *prop_animation);
-  }
-
-  property_animation_destroy(*prop_animation);
-  *prop_animation = NULL;
-}
-
-static void animate_layer(const Layer *layer)
-{
-  GRect to_rect;
-  /*
-    
-  if (toggle) {
-	to_rect = GRect(4, 4, 800, 80);
-  } else {
-	to_rect = GRect(-600, 4, 800, 80);
-  }
-  toggle = !toggle;
-
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Toggle is %u, %p", toggle, &toggle);
-   */
-  destroy_property_animation(&g_paSelectedAnimation);
-
-  g_paSelectedAnimation = property_animation_create_layer_frame(layer, NULL, &to_rect);
-  
-  //, This needs to be variable based on text length
-  const uint16_t animationDuration = 5000;
-  animation_set_duration((Animation*) g_paSelectedAnimation, animationDuration);
-  animation_set_curve((Animation*) g_paSelectedAnimation, AnimationCurveLinear);
-  
-  animation_set_handlers((Animation*) g_paSelectedAnimation, (AnimationHandlers) {
-	.started = (AnimationStartedHandler) animation_started,
-	.stopped = (AnimationStoppedHandler) animation_stopped,
-  }, NULL /* callback data */);
-  animation_schedule((Animation*) g_paSelectedAnimation);
-}
 
 static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
   // Process tap on ACCEL_AXIS_X, ACCEL_AXIS_Y or ACCEL_AXIS_Z

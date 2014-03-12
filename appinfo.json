@@ -1,0 +1,15 @@
+{
+  "uuid": "f0d3403d-9cec-4101-8502-2a801fe24761",
+  "shortName": "Alertify",
+  "longName": "Alertify",
+  "companyName": "Trogdan",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {},
+  "resources": {
+    "media": []
+  }
+}
