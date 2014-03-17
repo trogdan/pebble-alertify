@@ -5,13 +5,17 @@
 /////////////////////////////////////////////////////////////////////////////
 
 // Msg types
-#define MESSAGE_TYPE_ALERT  10
+#define MESSAGE_TYPE_ALERT  				10
 
 // Msg Keys
-#define MESSAGE_KEY_TYPE    1000
-#define MESSAGE_KEY_TITLE   1001
-#define MESSAGE_KEY_BODY    1002
+#define MESSAGE_KEY_TYPE    				1000
+#define MESSAGE_KEY_TITLE   				1001
+#define MESSAGE_KEY_BODY    				1002
 
+#define PEBBLE_MAX_SCREEN_WIDTH_PIXELS		144
+#define PEBBLE_MAX_SCREEN_HEIGHT_PIXELS		168
+
+#define ALERT_MESSAGE_MAX_TEXT_HEIGHT		4096
 /////////////////////////////////////////////////////////////////////////////
 // Globals
 /////////////////////////////////////////////////////////////////////////////
@@ -21,7 +25,10 @@ static Window *g_root_window;
 //static ScrollLayer *scroll_layer;
 
 // We also use a text layer to scroll in the scroll layer / splash screen
-static TextLayer *g_primary_text_layer;
+static TextLayer *g_primary_text_layer = NULL;
+static ScrollLayer *g_primary_scroll_layer = NULL;
+static GRect g_primary_text_bounds;
+
 static char g_splash_text[] = "Alertify";
 
 // The scroll layer can other things in it such as an invert layer
@@ -33,6 +40,7 @@ static char g_splash_text[] = "Alertify";
 //static const int vert_scroll_text_padding = 4;
 
 //root window doubles as a splash screen, shown while waiting for alert from phone
+static bool g_received_alert = false;
 
 /////////////////////////////////////////////////////////////////////////////
 // Function declarations
@@ -42,29 +50,80 @@ static char g_splash_text[] = "Alertify";
 // Function definitions
 /////////////////////////////////////////////////////////////////////////////
 static void root_window_load(Window *window) {
+	
+	//TODO make sure splash screen shows for a couple seconds if started manually
+	if(g_received_alert == false)
+	{
+		Layer *window_layer = window_get_root_layer(window);
+		GRect bounds = layer_get_frame(window_layer);
+				
+		// Initialize the text layer
+		if(g_primary_text_layer)
+		{
+			layer_remove_from_parent(text_layer_get_layer(g_primary_text_layer));
+			text_layer_destroy(g_primary_text_layer);
+		}
+		
+		GRect max_text_bounds = GRect(0, 40, bounds.size.w, bounds.size.h);
+		g_primary_text_layer = text_layer_create(max_text_bounds);
+			
+		text_layer_set_text(g_primary_text_layer, g_splash_text);
+		
+		// Change the font to a nice readable one
+		text_layer_set_font(g_primary_text_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
+		text_layer_set_text_alignment(g_primary_text_layer, GTextAlignmentCenter);
+		text_layer_set_background_color(g_primary_text_layer, GColorClear);
+		  
+		layer_add_child(window_layer, text_layer_get_layer(g_primary_text_layer));
+	}
+}
+
+static void window_show_message(Window *window, const char* title, const char* body, bool auto_scroll)
+{
+	(void)auto_scroll;
+	(void)title;
+	
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
+		
+	// Initialize the scroll layer
+	if(g_primary_scroll_layer)
+	{
+		layer_remove_from_parent(scroll_layer_get_layer(g_primary_scroll_layer));
+		scroll_layer_destroy(g_primary_scroll_layer);
+	}
 	
-	GRect max_text_bounds = GRect(0, 40, bounds.size.w, bounds.size.h);
+	g_primary_scroll_layer = scroll_layer_create(bounds);
 	
+	// This binds the scroll layer to the window so that up and down map to scrolling
+	// You may use scroll_layer_set_callbacks to add or override interactivity
+	scroll_layer_set_click_config_onto_window(g_primary_scroll_layer, window);
+
 	// Initialize the text layer
-	g_primary_text_layer = text_layer_create(max_text_bounds);
-	text_layer_set_text(g_primary_text_layer, g_splash_text);
+	if(g_primary_text_layer)
+	{
+		layer_remove_from_parent(text_layer_get_layer(g_primary_text_layer));
+		text_layer_destroy(g_primary_text_layer);
+	}
 	
-	// Change the font to a nice readable one
-	text_layer_set_font(g_primary_text_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
-	text_layer_set_text_alignment(g_primary_text_layer, GTextAlignmentCenter);
+	g_primary_text_bounds = bounds;
+	g_primary_text_bounds.size.h = ALERT_MESSAGE_MAX_TEXT_HEIGHT;
+	g_primary_text_layer = text_layer_create(g_primary_text_bounds);
+	
+	text_layer_set_text(g_primary_text_layer, body);
+	
+	// Change the font
+	text_layer_set_font(g_primary_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_set_text_alignment(g_primary_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(g_primary_text_layer, GColorClear);
-	  
-	// Trim text layer and scroll content to fit text box
-	//GSize max_size = text_layer_get_content_size(g_primary_text_layer);
-	//text_layer_set_size(g_primary_text_layer, max_size);
 	
-	// The inverter layer will highlight some text
-	//inverter_layer = inverter_layer_create(GRect(0, 28, bounds.size.w, 28));
-	//scroll_layer_add_child(scroll_layer, inverter_layer_get_layer(inverter_layer));
+	//Trim as necessary to contain only the message
+	g_primary_text_bounds.size = text_layer_get_content_size(g_primary_text_layer);
+	text_layer_set_size(g_primary_text_layer, g_primary_text_bounds.size);
+		
+	scroll_layer_add_child(g_primary_scroll_layer, text_layer_get_layer(g_primary_text_layer));
 	
-	layer_add_child(window_layer, text_layer_get_layer(g_primary_text_layer));
+	layer_add_child(window_layer, scroll_layer_get_layer(g_primary_scroll_layer));
 }
 
 static void root_window_appear(Window *window) {
@@ -72,7 +131,21 @@ static void root_window_appear(Window *window) {
 }
 
 static void root_window_disappear(Window *window) {
-	
+	/*
+	// Destroy the scroll layer
+	if(g_primary_text_layer)
+	{
+		layer_remove_from_parent(text_layer_get_layer(g_primary_text_layer));
+		text_layer_destroy(g_primary_text_layer);
+	}
+
+	// Destroy the scroll layer
+	if(g_primary_scroll_layer)
+	{
+		layer_remove_from_parent(text_layer_get_layer(g_primary_scroll_layer));
+		scroll_layer_destroy(g_primary_scroll_layer);
+	}
+	*/
 }
 
 static void root_window_unload(Window *window) {
@@ -104,10 +177,16 @@ static void in_received_handler(DictionaryIterator *received, void *context) {
 	switch(msg_tuple->value->uint8)
 	{
 	case MESSAGE_TYPE_ALERT:
+		g_received_alert = true;
+		
 		body_tuple = dict_find(received, MESSAGE_KEY_BODY);
 		title_tuple = dict_find(received, MESSAGE_KEY_TITLE);
 		
-		//show_alert(title, body);
+		window_show_message(
+				g_root_window, 
+				title_tuple->value->cstring, 
+				body_tuple->value->cstring, 
+				false);
 		break;
 	}
  }
