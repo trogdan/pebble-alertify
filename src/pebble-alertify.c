@@ -29,6 +29,8 @@ static TextLayer *g_primary_text_layer = NULL;
 static ScrollLayer *g_primary_scroll_layer = NULL;
 static GRect g_primary_text_bounds;
 
+static const int g_vert_scroll_text_padding = 4;
+
 static char g_splash_text[] = "Alertify";
 
 // The scroll layer can other things in it such as an invert layer
@@ -113,14 +115,15 @@ static void window_show_message(Window *window, const char* title, const char* b
 	text_layer_set_text(g_primary_text_layer, body);
 	
 	// Change the font
-	text_layer_set_font(g_primary_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+	text_layer_set_font(g_primary_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(g_primary_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(g_primary_text_layer, GColorClear);
 	
 	//Trim as necessary to contain only the message
 	g_primary_text_bounds.size = text_layer_get_content_size(g_primary_text_layer);
 	text_layer_set_size(g_primary_text_layer, g_primary_text_bounds.size);
-		
+	scroll_layer_set_content_size(g_primary_scroll_layer, GSize(bounds.size.w, g_primary_text_bounds.size.h + g_vert_scroll_text_padding));
+
 	scroll_layer_add_child(g_primary_scroll_layer, text_layer_get_layer(g_primary_text_layer));
 	
 	layer_add_child(window_layer, scroll_layer_get_layer(g_primary_scroll_layer));
